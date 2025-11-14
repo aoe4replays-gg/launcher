@@ -32,4 +32,6 @@ if you also want to remove the downloaded AOE4 replay files, you can find them i
 
 OPEN-SOURCE
 
-The code of the launcher is open source, you can find it at https://github.com/aoe4replays-gg/launcher alongside the instructions to buidd it yourself.
+The code of the launcher is open-source.
+
+You can find it (with the instructions to build it yourself) at : https://github.com/aoe4replays-gg/launcher
