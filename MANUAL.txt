@@ -1,0 +1,37 @@
+HOW TO USE
+
+1. place aoe4_replay_launcher.exe in a folder of your choice, and run it once.
+   -> if you move it somewhere else afterward, you'll have to run it again, so that its new path gets updated.
+   -> configuration is fully automated, press Enter to exit the installation window.
+
+2. go to https://aoe4replays.gg and click on the run button of a replay of your choice.
+   -> your browser will ask permission for running the launcher.
+   -> once you validate, the launcher will automatically download the replay file and start AOE4 in replay mode on that replay.
+
+note 1 : make sure AOE4 is not already running beforehand.
+note 2 : you should get an authentication error message in AOE4 at the start, this is normal in replay mode, just click OK and the repay will start.
+
+
+LIMITATIONS
+
+- only works for Steam users (no Game Pass support).
+- only available on Windows.
+
+
+HOW TO UNINSTALL
+
+to remove everything from your system :
+- type <windows_key> + r.
+- type "regedit" (without the quotes) and press Enter.
+- navigate in the left menu to the entry "HKEY_CURRENT_USER\Software\Classes\aoe4rep".
+- right-click "aoe4rep" in the left menu, press "delete" and confirm.
+- delete the aoe4_replay_launcher.exe file (and the MANUAL.txt file you are currently reading).
+
+if you also want to remove the downloaded AOE4 replay files, you can find them in <user_home>\Documents\My Games\Age of Empires IV\playback, those are the files with names like "AgeIV_Replay_205141609".
+
+
+HOW THE LAUNCHER WORKS (technical info for nerds)
+
+- when launched manually aoe4_replay_launcher.exe registers itself in Windows as the handler of URL protocol "aoe4rep://" (this is a custom URL format we invented for this specific purpose).
+- then when you click a replay link on https://aoe4replays.gg, Windows knows based on its URL format (aoe4rep://) that it needs to be passed to the launcher, so windows starts the launcher and gives it the URL.
+- the launcher extracts the match ID from the URL, proceeds to download and unzip the replay into your local replay folder, and starts AOE4 through Steam in replay mode (with "-dev -replay" command line arguments).

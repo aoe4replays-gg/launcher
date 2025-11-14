@@ -1,0 +1,5 @@
+[tasks.package-zip]
+script = [
+    "cargo build --release",
+    "powershell Compress-Archive -Path target/release/aoe4_replay_launcher.exe, MANUAL.txt -DestinationPath aoe4_replay_launcher.zip -Force"
+]
