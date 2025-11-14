@@ -30,8 +30,6 @@ to remove everything from your system :
 if you also want to remove the downloaded AOE4 replay files, you can find them in <user_home>\Documents\My Games\Age of Empires IV\playback, those are the files with names like "AgeIV_Replay_205141609".
 
 
-HOW THE LAUNCHER WORKS (technical info for nerds)
+OPEN-SOURCE
 
-- when launched manually aoe4_replay_launcher.exe registers itself in Windows as the handler of URL protocol "aoe4rep://" (this is a custom URL format we invented for this specific purpose).
-- then when you click a replay link on https://aoe4replays.gg, Windows knows based on its URL format (aoe4rep://) that it needs to be passed to the launcher, so windows starts the launcher and gives it the URL.
-- the launcher extracts the match ID from the URL, proceeds to download and unzip the replay into your local replay folder, and starts AOE4 through Steam in replay mode (with "-dev -replay" command line arguments).
+The code of the launcher is open source, you can find it at https://github.com/aoe4replays-gg/launcher alongside the instructions to buidd it yourself.
