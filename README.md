@@ -14,12 +14,12 @@ Then when the user clicks a replay URL on aoe4replays.gg, the launcher :
 - gets triggered by Windows and receives the replay URL,
 - extracts the ID of the match from the URL,
 - downloads the corresponding replay file from aoe4replays.gg,
-- unzips it into the local aoe4 playback folder,
-- starts AOE4 in replay mode through Steam, with appropriate arguments so that it immediately runs the replay.
+- unzips it into the local AOE4 playback folder,
+- starts AOE4 in dev mode through Steam, with appropriate arguments so that it immediately runs the replay.
 
-## Building the project from sources
-- be on a windows machine with Rust installed
-- clone this github repository
-- run `cargo build --release` in the root folder of the repository
-- the executable is gets generated at `target/release/aoe4_replay_launcher.exe`
+## Building the launcher from the sources
+- be on a Windows machine with Rust installed,
+- clone this github repository,
+- run `cargo build --release` at the root folder of the repository,
+- the executable gets generated in `target/release/aoe4_replay_launcher.exe`
 
