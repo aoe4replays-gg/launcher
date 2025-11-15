@@ -4,14 +4,14 @@ use std::io::{self, copy, Cursor};
 use std::path::PathBuf;
 use std::process::Command;
 
-use dirs::home_dir;
+use dirs::document_dir;
 use flate2::read::GzDecoder;
 use reqwest::blocking::get;
 use winreg::enums::*;
 use winreg::RegKey;
 
 const HOME_URL: &str = "https://aoe4replays.gg";
-const PLAYBACK_PATH: &str = "Documents\\My Games\\Age of Empires IV\\playback";
+const PLAYBACK_PATH: &str = "My Games\\Age of Empires IV\\playback";
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -43,17 +43,18 @@ fn wait_for_key() {
 
 fn download_replay(match_id: u64) -> Result<String, Box<dyn std::error::Error>> {
     let filename = format!("AgeIV_Replay_{}", match_id);
-    let mut folder = home_dir().ok_or("Could not find home directory")?;
+    let mut folder = document_dir().ok_or("Could not find Documents directory")?;
     folder.push(PLAYBACK_PATH);
+    println!("Replay playback folder detected in : {}", folder.display());
     let mut file_path = folder.clone();
     file_path.push(&filename);
     let url = format!("{}/api/replays/{}", HOME_URL, match_id);
-    println!("Downloading replay file {} into {}", filename, folder.display());
     let bytes = get(url)?.bytes()?;
     let cursor = Cursor::new(bytes);
     let mut decoder = GzDecoder::new(cursor);
     let mut output = File::create(file_path)?;
     copy(&mut decoder, &mut output)?;
+    println!("Downloaded replay file {}", filename);
     Ok(filename)
 }
 
