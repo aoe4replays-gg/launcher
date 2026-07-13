@@ -4,7 +4,9 @@ A launcher that allows replays from https://aoe4replays.gg to be run automatical
 
 Currently only works on Windows and if AOE4 is installed through Steam.
 
-[Download links from last release (includes instructions)](https://github.com/aoe4replays-gg/launcher/releases/tag/V1.1)
+Download links (with instructions) :
+- [Windows launcher v1.1](https://github.com/aoe4replays-gg/launcher/releases/download/V1.1/aoe4-replay-launcher-windows-x86_64.zip)
+- [Linux launcher v1.1](https://github.com/aoe4replays-gg/launcher/releases/download/V1.1/aoe4-replay-launcher-linux-x86_64.zip)
 
 
 ## How it works
