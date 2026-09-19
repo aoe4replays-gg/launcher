@@ -1,12 +1,16 @@
 IMPORTANT NOTE
 
-The launcher only works for Steam users (no Game Pass support)
+Windows supports Steam and Xbox / Microsoft Store (including Game Pass).
+Linux supports Steam through Proton.
 
 HOW TO USE
 
 1. place the launcher executable file in a folder of your choice, and run it once.
    -> if you move it somewhere else afterward, you'll have to run it again, so that its new path gets updated in the OS.
-   -> configuration is fully automated, press Enter to exit the installation window.
+   -> on Windows, enter 1 for Steam or 2 for Xbox / Microsoft Store.
+   -> the URL handler remembers the choice; no installation detection is performed.
+   -> run the launcher without arguments again to change editions.
+   -> press Enter to exit the installation window.
 
 2. go to https://aoe4replays.gg and click on the run button from a replay of your choice.
    -> your browser will ask permission for running the launcher.

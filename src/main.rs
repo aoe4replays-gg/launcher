@@ -15,15 +15,28 @@ use winreg::enums::*;
 #[cfg(windows)]
 use winreg::RegKey;
 
+#[cfg(windows)]
+mod windows;
+
 const HOME_URL: &str = "https://aoe4replays.gg";
 const AOE4_APP_ID: &str = "1466860";
 
 fn main() {
     let args: Vec<String> = env::args().collect();
-    if args.len() > 1 {
-        let url = args[1].to_string();
+    #[cfg(windows)]
+    let (xbox, url) = match windows::parse_args(&args[1..]) {
+        Ok(parsed) => parsed,
+        Err(error) => {
+            eprintln!("{error}");
+            wait_for_key();
+            std::process::exit(1);
+        }
+    };
+    #[cfg(not(windows))]
+    let url = args.get(1).map(String::as_str);
+    if let Some(url) = url {
         println!("URL = {url}");
-        let replay_name = match download_replay(&url) {
+        let replay_name = match download_replay(url) {
             Ok(replay_name) => replay_name,
             Err(error) => {
                 eprintln!("Failed to download replay: {error}");
@@ -31,6 +44,9 @@ fn main() {
                 std::process::exit(1);
             }
         };
+        #[cfg(windows)]
+        run_replay(replay_name, xbox);
+        #[cfg(not(windows))]
         run_replay(replay_name);
     } else {
         println!("Configuring...");
@@ -88,7 +104,15 @@ fn playback_dir() -> Result<PathBuf, Box<dyn std::error::Error>> {
 }
 
 #[cfg(windows)]
-fn run_replay(replay_name: String) {
+fn run_replay(replay_name: String, xbox: bool) {
+    if xbox {
+        if let Err(error) = windows::launch_xbox(&replay_name) {
+            eprintln!("Failed to launch Xbox edition: {error}");
+            wait_for_key();
+            std::process::exit(1);
+        }
+        return;
+    }
     let hkcu = RegKey::predef(HKEY_CURRENT_USER);
     let steam_key = hkcu
         .open_subkey("Software\\Valve\\Steam")
@@ -112,13 +136,14 @@ fn run_replay(replay_name: String) {
 
 #[cfg(windows)]
 fn register_url_protocol() -> std::io::Result<()> {
+    let xbox = windows::choose_platform(&mut io::stdin().lock(), &mut io::stdout().lock())?;
     let hkcu = RegKey::predef(HKEY_CURRENT_USER);
     let (key, _) = hkcu.create_subkey("Software\\Classes\\aoe4rep")?;
     key.set_value("", &"URL:AOE4Rep Protocol")?;
     key.set_value("URL Protocol", &"")?;
     let (command_key, _) = key.create_subkey(r"shell\open\command")?;
     let exe_path: PathBuf = env::current_exe()?;
-    command_key.set_value("", &format!("\"{}\" \"%1\"", exe_path.to_str().unwrap()))?;
+    command_key.set_value("", &windows::protocol_command(exe_path.to_str().unwrap(), xbox))?;
     println!("Protocol 'aoe4rep' registered successfully for the current user!");
     Ok(())
 }

@@ -2,7 +2,7 @@
 
 A launcher that allows replays from https://aoe4replays.gg to be run in a single click from the website.
 
-Currently only works with Steam (no Gamepass support).
+Supports Steam on Windows and Linux, and Xbox / Microsoft Store (including Game Pass) on Windows.
 
 Download links (with instructions) in https://github.com/aoe4replays-gg/launcher/releases
 
@@ -14,10 +14,19 @@ Then when the user clicks a replay URL on aoe4replays.gg, the launcher :
 - passes the original URL to `https://aoe4replays.gg/api/replays` as the encoded `url` query parameter,
 - downloads the corresponding replay file from aoe4replays.gg using a generated local filename,
 - unzips it into the local AOE4 playback folder,
-- starts AOE4 in dev mode through Steam, with appropriate arguments so that it immediately runs the replay.
+- starts AOE4 in dev mode through the selected platform (Steam on Linux), with appropriate arguments so that it immediately runs the replay.
 
 ## Building the launcher from the sources
 - be on a Windows machine with Rust installed,
 - clone this github repository,
 - run `cargo build --release` at the root folder of the repository,
 - the executable gets generated in `target/release/aoe4_replay_launcher.exe`
+
+## Choosing between Steam and Xbox
+
+Run the launcher without arguments and choose `1` for Steam or `2` for Xbox /
+Microsoft Store. Setup registers the `aoe4rep://` handler with `--steam` or `--xbox`:
+
+```text
+"C:\path\aoe4_replay_launcher.exe" --xbox "%1"
+```
