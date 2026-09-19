@@ -1,4 +1,5 @@
 use std::env;
+mod updater;
 #[cfg(target_os = "linux")]
 use std::fs;
 use std::fs::File;
@@ -19,6 +20,23 @@ const HOME_URL: &str = "https://aoe4replays.gg";
 const AOE4_APP_ID: &str = "1466860";
 
 fn main() {
+    // Keep this side-effect free: installation uses it to avoid downgrading a newer copy.
+    if env::args_os().nth(1).as_deref() == Some(std::ffi::OsStr::new("--version")) {
+        println!("{}", env!("CARGO_PKG_VERSION"));
+        return;
+    }
+    match updater::install_and_relaunch() {
+        Ok(Some(code)) => std::process::exit(code),
+        Ok(None) => {}
+        Err(error) => {
+            eprintln!("Failed to install launcher: {error}");
+            wait_for_key();
+            std::process::exit(1);
+        }
+    }
+    if let Err(error) = updater::update_on_launch() {
+        eprintln!("Update unavailable; continuing with this version: {error}");
+    }
     let args: Vec<String> = env::args().collect();
     if args.len() > 1 {
         let url = args[1].to_string();
@@ -112,12 +130,16 @@ fn run_replay(replay_name: String) {
 
 #[cfg(windows)]
 fn register_url_protocol() -> std::io::Result<()> {
+    register_url_protocol_at(&updater::install_path()?)
+}
+
+#[cfg(windows)]
+fn register_url_protocol_at(exe_path: &std::path::Path) -> std::io::Result<()> {
     let hkcu = RegKey::predef(HKEY_CURRENT_USER);
     let (key, _) = hkcu.create_subkey("Software\\Classes\\aoe4rep")?;
     key.set_value("", &"URL:AOE4Rep Protocol")?;
     key.set_value("URL Protocol", &"")?;
     let (command_key, _) = key.create_subkey(r"shell\open\command")?;
-    let exe_path: PathBuf = env::current_exe()?;
     command_key.set_value("", &format!("\"{}\" \"%1\"", exe_path.to_str().unwrap()))?;
     println!("Protocol 'aoe4rep' registered successfully for the current user!");
     Ok(())
@@ -171,6 +193,7 @@ fn find_aoe4_library(steam_install: &PathBuf) -> Result<PathBuf, Box<dyn std::er
     ).into())
 }
 
+#[cfg(any(target_os = "linux", test))]
 fn parse_library_paths_from_vdf(content: &str) -> Vec<PathBuf> {
     content
         .lines()
@@ -211,7 +234,10 @@ fn find_steam_exe() -> Result<PathBuf, Box<dyn std::error::Error>> {
         let path_str = String::from_utf8(output.stdout)?.trim().to_string();
         return Ok(PathBuf::from(path_str));
     }
-    Err("Steam executable not found. Install Steam from https://store.steampowered.com/about/".into())
+    Err(
+        "Steam executable not found. Install Steam from https://store.steampowered.com/about/"
+            .into(),
+    )
 }
 
 #[cfg(target_os = "linux")]
@@ -233,7 +259,11 @@ fn run_replay(replay_name: String) {
 
 #[cfg(target_os = "linux")]
 fn register_url_protocol() -> std::io::Result<()> {
-    let exe_path = env::current_exe()?;
+    register_url_protocol_at(&updater::install_path()?)
+}
+
+#[cfg(target_os = "linux")]
+fn register_url_protocol_at(exe_path: &std::path::Path) -> std::io::Result<()> {
     let exe_str = exe_path
         .to_str()
         .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "Non-UTF8 exe path"))?;
@@ -249,9 +279,16 @@ fn register_url_protocol() -> std::io::Result<()> {
     let desktop_path = apps_dir.join("aoe4rep-handler.desktop");
     fs::write(&desktop_path, &desktop_content)?;
 
-    Command::new("xdg-mime")
-        .args(["default", "aoe4rep-handler.desktop", "x-scheme-handler/aoe4rep"])
+    let status = Command::new("xdg-mime")
+        .args([
+            "default",
+            "aoe4rep-handler.desktop",
+            "x-scheme-handler/aoe4rep",
+        ])
         .status()?;
+    if !status.success() {
+        return Err(io::Error::other("xdg-mime failed to register aoe4rep"));
+    }
 
     // Non-fatal: updates MIME cache so the handler is picked up immediately
     Command::new("update-desktop-database")
@@ -301,7 +338,10 @@ mod tests {
 }"#;
         let paths = parse_library_paths_from_vdf(vdf);
         assert_eq!(paths.len(), 2);
-        assert_eq!(paths[0], PathBuf::from("/home/user/.steam/debian-installation"));
+        assert_eq!(
+            paths[0],
+            PathBuf::from("/home/user/.steam/debian-installation")
+        );
         assert_eq!(paths[1], PathBuf::from("/mnt/storage/SteamLibrary"));
     }
 

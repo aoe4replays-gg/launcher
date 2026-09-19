@@ -55,6 +55,18 @@ jobs:
       - name: Build release executable
         run: cargo build --release --locked
 
+      - name: Test launcher
+        run: cargo test --locked
+
+      - name: Verify release version
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          $version = (& '${{ matrix.executable }}' --version).Trim()
+          if ($env:RELEASE_TAG -cne "v$version") { throw "Release tag must be v$version" }
+
       - name: Prepare release package
         shell: pwsh
         run: |
@@ -88,6 +100,7 @@ jobs:
           chmod +x artifacts/aoe4-replay-launcher-linux-x86_64/aoe4_replay_launcher
           zip -j aoe4-replay-launcher-linux-x86_64.zip artifacts/aoe4-replay-launcher-linux-x86_64/*
           zip -j aoe4-replay-launcher-windows-x86_64.zip artifacts/aoe4-replay-launcher-windows-x86_64/*
+          sha256sum aoe4-replay-launcher-*.zip > SHA256SUMS
 
       - name: Publish GitHub release
         env:
@@ -98,4 +111,5 @@ jobs:
           gh release create "$RELEASE_TAG" \
             aoe4-replay-launcher-linux-x86_64.zip \
             aoe4-replay-launcher-windows-x86_64.zip \
+            SHA256SUMS \
             --verify-tag --title "$RELEASE_TAG" --generate-notes

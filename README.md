@@ -17,7 +17,7 @@ Then when the user clicks a replay URL on aoe4replays.gg, the launcher :
 - starts AOE4 in dev mode through Steam, with appropriate arguments so that it immediately runs the replay.
 
 ## Building the launcher from the sources
-- be on a Windows machine with Rust installed,
+- be on a Windows or Linux machine with Rust installed,
 - clone this github repository,
 - run `cargo build --release` at the root folder of the repository,
 - the executable gets generated in `target/release/aoe4_replay_launcher.exe`
