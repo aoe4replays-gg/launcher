@@ -4,8 +4,11 @@ The launcher only works for Steam users (no Game Pass support)
 
 HOW TO USE
 
-1. place the launcher executable file in a folder of your choice, and run it once.
-   -> if you move it somewhere else afterward, you'll have to run it again, so that its new path gets updated in the OS.
+1. extract the launcher executable and run it once, without administrator privileges or sudo.
+   -> Windows: it installs itself in %LOCALAPPDATA%\AOE4ReplayLauncher.
+   -> Linux: first run chmod +x aoe4_replay_launcher, then run ./aoe4_replay_launcher.
+      It installs itself in ~/.local/bin (Steam with Proton and xdg-mime are required).
+   -> the downloaded copy can be deleted after installation.
    -> configuration is fully automated, press Enter to exit the installation window.
 
 2. go to https://aoe4replays.gg and click on the run button from a replay of your choice.
@@ -15,14 +18,21 @@ HOW TO USE
 note 1 : exit AOE4 if it is already open before running a replay.
 note 2 : if AOE4 stays tuck on blackscreen it's probably that the replay is from an older patch and incompatible with current game version.
 
+
 HOW TO UNINSTALL
 
-to remove everything from your system :
+Windows:
 - type <windows_key> + r.
 - type "regedit" (without the quotes) and press Enter.
 - navigate in the left menu to the entry "HKEY_CURRENT_USER\Software\Classes\aoe4rep".
 - right-click "aoe4rep" in the left menu, press "delete" and confirm.
-- delete the aoe4_replay_launcher.exe file (and the MANUAL.txt file you are currently reading).
+- delete the %LOCALAPPDATA%\AOE4ReplayLauncher folder and any downloaded copies.
+
+Linux:
+- delete ~/.local/bin/aoe4_replay_launcher and ~/.local/bin/.aoe4-replay-launcher.lock.
+- delete ~/.local/share/applications/aoe4rep-handler.desktop.
+- remove the aoe4rep-handler.desktop association from your desktop's mimeapps.list if present.
+- delete any downloaded copies.
 
 if you also want to remove the downloaded AOE4 replay files, you can find them in <user_home>\Documents\My Games\Age of Empires IV\playback, those are the files with names like "AgeIV_Replay_205141609".
 

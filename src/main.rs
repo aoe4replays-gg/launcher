@@ -1,46 +1,100 @@
 use std::env;
+mod updater;
 #[cfg(target_os = "linux")]
 use std::fs;
 use std::fs::File;
-use std::io::{self, copy, Cursor};
+use std::io::{self, Cursor, copy};
 use std::path::PathBuf;
 use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use flate2::read::GzDecoder;
-use reqwest::blocking::get;
+use reqwest::blocking::Client;
 
 #[cfg(windows)]
-use winreg::enums::*;
-#[cfg(windows)]
 use winreg::RegKey;
+#[cfg(windows)]
+use winreg::enums::*;
 
 const HOME_URL: &str = "https://aoe4replays.gg";
 const AOE4_APP_ID: &str = "1466860";
+// Lets the server tell launcher versions apart.
+const USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"));
 
 fn main() {
+    // Keep this side-effect free: installation uses it to avoid downgrading a newer copy.
+    if env::args_os().nth(1).as_deref() == Some(std::ffi::OsStr::new("--version")) {
+        println!("{}", env!("CARGO_PKG_VERSION"));
+        return;
+    }
+    // Only the installed copy updates itself; other copies must not replace their own file.
+    let installed = match updater::install_and_relaunch() {
+        Ok(updater::Launch::Relaunched(code)) => std::process::exit(code),
+        Ok(updater::Launch::Installed) => true,
+        Ok(updater::Launch::InPlace) => false,
+        Err(error) => {
+            eprintln!("Failed to install launcher; running this copy instead: {error}");
+            false
+        }
+    };
+    println!("AoE4 Replay Launcher v{}", env!("CARGO_PKG_VERSION"));
     let args: Vec<String> = env::args().collect();
     if args.len() > 1 {
         let url = args[1].to_string();
         println!("URL = {url}");
-        let replay_name = match download_replay(&url) {
-            Ok(replay_name) => replay_name,
-            Err(error) => {
-                eprintln!("Failed to download replay: {error}");
-                wait_for_key();
-                std::process::exit(1);
-            }
-        };
-        run_replay(replay_name);
+        let result = download_replay(&url).and_then(run_replay);
+        if let Err(error) = &result {
+            eprintln!("Failed to start replay: {error}");
+        }
+        // Update even after a failure: a newer launcher may be the fix.
+        let updated = installed && update();
+        if result.is_err() {
+            wait_for_key();
+            std::process::exit(1);
+        }
+        // The window closes on exit; leave time to read the update message.
+        if updated {
+            std::thread::sleep(std::time::Duration::from_secs(3));
+        }
     } else {
         println!("Configuring...");
-        if let Err(e) = register_url_protocol() {
+        if let Err(e) = register_url_protocol(installed) {
             eprintln!("Failed to configure aoe4rep protocol: {}", e);
         } else {
             println!("Configuration done, you can now launch replays from {HOME_URL}");
         }
+        if installed {
+            update();
+        }
         wait_for_key();
     }
+}
+
+// Runs after the replay starts so a slow or unreachable GitHub never delays it.
+// Returns whether a new version was installed.
+fn update() -> bool {
+    println!("Checking for updates...");
+    match updater::update_on_launch() {
+        Ok(true) => true,
+        Ok(false) => {
+            println!("Launcher is up to date");
+            false
+        }
+        Err(error) => {
+            eprintln!("Update unavailable; continuing with this version: {error}");
+            false
+        }
+    }
+}
+
+// Point the handler at the copy that is actually running when installation was skipped or failed.
+fn register_url_protocol(installed: bool) -> io::Result<()> {
+    let exe = if installed {
+        updater::install_path()?
+    } else {
+        env::current_exe()?
+    };
+    register_url_protocol_at(&exe)
 }
 
 fn wait_for_key() {
@@ -56,7 +110,11 @@ fn download_replay(url: &str) -> Result<String, Box<dyn std::error::Error>> {
     println!("Replay playback folder detected in : {}", folder.display());
     let mut file_path = folder.clone();
     file_path.push(&filename);
-    let response = get(replay_download_url(url)?)?;
+    let response = Client::builder()
+        .user_agent(USER_AGENT)
+        .build()?
+        .get(replay_download_url(url)?)
+        .send()?;
     if response.status() == reqwest::StatusCode::FORBIDDEN {
         return Err("Replays must be started from aoe4replays.gg.".into());
     }
@@ -88,14 +146,14 @@ fn playback_dir() -> Result<PathBuf, Box<dyn std::error::Error>> {
 }
 
 #[cfg(windows)]
-fn run_replay(replay_name: String) {
+fn run_replay(replay_name: String) -> Result<(), Box<dyn std::error::Error>> {
     let hkcu = RegKey::predef(HKEY_CURRENT_USER);
     let steam_key = hkcu
         .open_subkey("Software\\Valve\\Steam")
-        .expect("Steam entry not found in registry");
+        .map_err(|e| format!("Steam entry not found in registry: {e}"))?;
     let steam_exe: String = steam_key
         .get_value("SteamExe")
-        .expect("SteamExe entry not found in registry");
+        .map_err(|e| format!("SteamExe entry not found in registry: {e}"))?;
     println!("Steam located in {steam_exe}");
     println!("Starting AOE4...");
     Command::new(steam_exe)
@@ -106,18 +164,19 @@ fn run_replay(replay_name: String) {
             "-replay",
             &format!("playback:{}", replay_name),
         ])
-        .status()
-        .expect("Failed to launch command");
+        // Don't wait: when Steam isn't running yet, this process is the Steam client itself.
+        .spawn()
+        .map_err(|e| format!("Failed to launch Steam: {e}"))?;
+    Ok(())
 }
 
 #[cfg(windows)]
-fn register_url_protocol() -> std::io::Result<()> {
+fn register_url_protocol_at(exe_path: &std::path::Path) -> std::io::Result<()> {
     let hkcu = RegKey::predef(HKEY_CURRENT_USER);
     let (key, _) = hkcu.create_subkey("Software\\Classes\\aoe4rep")?;
     key.set_value("", &"URL:AOE4Rep Protocol")?;
     key.set_value("URL Protocol", &"")?;
     let (command_key, _) = key.create_subkey(r"shell\open\command")?;
-    let exe_path: PathBuf = env::current_exe()?;
     command_key.set_value("", &format!("\"{}\" \"%1\"", exe_path.to_str().unwrap()))?;
     println!("Protocol 'aoe4rep' registered successfully for the current user!");
     Ok(())
@@ -171,6 +230,7 @@ fn find_aoe4_library(steam_install: &PathBuf) -> Result<PathBuf, Box<dyn std::er
     ).into())
 }
 
+#[cfg(any(target_os = "linux", test))]
 fn parse_library_paths_from_vdf(content: &str) -> Vec<PathBuf> {
     content
         .lines()
@@ -211,12 +271,15 @@ fn find_steam_exe() -> Result<PathBuf, Box<dyn std::error::Error>> {
         let path_str = String::from_utf8(output.stdout)?.trim().to_string();
         return Ok(PathBuf::from(path_str));
     }
-    Err("Steam executable not found. Install Steam from https://store.steampowered.com/about/".into())
+    Err(
+        "Steam executable not found. Install Steam from https://store.steampowered.com/about/"
+            .into(),
+    )
 }
 
 #[cfg(target_os = "linux")]
-fn run_replay(replay_name: String) {
-    let steam_exe = find_steam_exe().expect("Steam not found");
+fn run_replay(replay_name: String) -> Result<(), Box<dyn std::error::Error>> {
+    let steam_exe = find_steam_exe()?;
     println!("Steam located at {}", steam_exe.display());
     println!("Starting AOE4...");
     Command::new(steam_exe)
@@ -227,13 +290,14 @@ fn run_replay(replay_name: String) {
             "-replay",
             &format!("playback:{}", replay_name),
         ])
-        .status()
-        .expect("Failed to launch Steam");
+        // Don't wait: when Steam isn't running yet, this process is the Steam client itself.
+        .spawn()
+        .map_err(|e| format!("Failed to launch Steam: {e}"))?;
+    Ok(())
 }
 
 #[cfg(target_os = "linux")]
-fn register_url_protocol() -> std::io::Result<()> {
-    let exe_path = env::current_exe()?;
+fn register_url_protocol_at(exe_path: &std::path::Path) -> std::io::Result<()> {
     let exe_str = exe_path
         .to_str()
         .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "Non-UTF8 exe path"))?;
@@ -249,9 +313,16 @@ fn register_url_protocol() -> std::io::Result<()> {
     let desktop_path = apps_dir.join("aoe4rep-handler.desktop");
     fs::write(&desktop_path, &desktop_content)?;
 
-    Command::new("xdg-mime")
-        .args(["default", "aoe4rep-handler.desktop", "x-scheme-handler/aoe4rep"])
+    let status = Command::new("xdg-mime")
+        .args([
+            "default",
+            "aoe4rep-handler.desktop",
+            "x-scheme-handler/aoe4rep",
+        ])
         .status()?;
+    if !status.success() {
+        return Err(io::Error::other("xdg-mime failed to register aoe4rep"));
+    }
 
     // Non-fatal: updates MIME cache so the handler is picked up immediately
     Command::new("update-desktop-database")
@@ -285,6 +356,14 @@ mod tests {
     }
 
     #[test]
+    fn user_agent_carries_launcher_version() {
+        assert_eq!(
+            USER_AGENT,
+            format!("aoe4_replay_launcher/{}", env!("CARGO_PKG_VERSION"))
+        );
+    }
+
+    #[test]
     fn vdf_parser_extracts_all_paths() {
         let vdf = r#""libraryfolders"
 {
@@ -301,7 +380,10 @@ mod tests {
 }"#;
         let paths = parse_library_paths_from_vdf(vdf);
         assert_eq!(paths.len(), 2);
-        assert_eq!(paths[0], PathBuf::from("/home/user/.steam/debian-installation"));
+        assert_eq!(
+            paths[0],
+            PathBuf::from("/home/user/.steam/debian-installation")
+        );
         assert_eq!(paths[1], PathBuf::from("/mnt/storage/SteamLibrary"));
     }
 
